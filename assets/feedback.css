@@ -1,0 +1,263 @@
+/**
+ * MH Anmerkungen — Gestaltung.
+ *
+ * Alle Klassen mit avfb- geprefixt, damit nichts mit dem Theme kollidiert.
+ * Die Farben liegen in eigenen Variablen: setzt das Theme --mhf-mark, --mhf-bg
+ * oder --mhf-ink, fügt sich das Werkzeug ein; sonst greifen die Vorgaben.
+ */
+:root{
+  --mhf-mark: #d8402f;
+  --mhf-bg: #17161a;
+  --mhf-ink: #f5f2ee;
+}
+
+/**
+ * Rückmeldung-Werkzeug. Liegt über der Seite. Alle Klassen mit avfb- geprefixt,
+ * damit nichts mit dem Theme kollidiert. Farben greifen die Theme-Variablen auf,
+ * mit Rückfall, falls das Werkzeug mal ohne das Theme läuft.
+ */
+.avfb, .avfb *{box-sizing:border-box}
+.avfb{
+  --avfb-void:var(--mhf-bg, #17161a);
+  --avfb-dark:#141416;
+  --avfb-gold:var(--mhf-mark, #d8402f);
+  --avfb-gold-soft:#e6cf9e;
+  --avfb-ink:var(--mhf-ink, #f5f2ee);
+  --avfb-mute:#a8a29a;
+  --avfb-line:#2a2a2e;
+  --avfb-note:var(--mhf-mark, #d8402f);
+  font-family:var(--mhf-font, system-ui, -apple-system, "Segoe UI", sans-serif);
+  /* Eigene Textfarbe setzen: sonst erbt das Werkzeug die dunkle Schriftfarbe
+     der Seite und steht dunkel auf dunklem Grund. */
+  color:var(--avfb-ink);
+}
+
+/* Annotationsebene: liegt über dem Dokument und scrollt mit. */
+#avfb-layer{position:absolute;inset:0;z-index:2147483000;pointer-events:none}
+#avfb-layer.avfb-armed{pointer-events:auto;cursor:crosshair}
+#avfb-layer svg{position:absolute;inset:0;width:100%;overflow:visible}
+
+/* Startknopf: links unten, über dem Vorschau-Badge – rechts unten sitzt das
+   Objektiv, dem gehen wir aus dem Weg. */
+.avfb-start{position:fixed;z-index:2147483400;left:max(16px,env(safe-area-inset-left));
+  bottom:calc(max(16px,env(safe-area-inset-bottom)) + 48px);
+  display:inline-flex;align-items:center;gap:9px;padding:11px 17px;border:none;border-radius:999px;
+  background:var(--avfb-gold);color:var(--avfb-void);font:600 .9rem/1 var(--sans,system-ui);letter-spacing:.01em;
+  cursor:pointer;box-shadow:0 12px 34px rgba(0,0,0,.4);transition:transform .15s,box-shadow .15s}
+.avfb-start:hover{transform:translateY(-1px);box-shadow:0 16px 40px rgba(0,0,0,.5)}
+.avfb-start svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+/* Einstiegs-Hinweis (erste Aktivierung) */
+.avfb-tip{position:fixed;z-index:2147483400;left:max(16px,env(safe-area-inset-left));
+  bottom:calc(max(16px,env(safe-area-inset-bottom)) + 100px);
+  width:min(300px,80vw);background:var(--avfb-dark);color:var(--avfb-ink);border:1px solid color-mix(in srgb,var(--avfb-gold) 35%,transparent);
+  border-radius:12px;padding:16px 18px;box-shadow:0 20px 50px rgba(0,0,0,.55);line-height:1.5;font-size:.9rem}
+.avfb-tip::after{content:"";position:absolute;left:26px;bottom:-8px;width:14px;height:14px;background:var(--avfb-dark);
+  border-right:1px solid color-mix(in srgb,var(--avfb-gold) 35%,transparent);border-bottom:1px solid color-mix(in srgb,var(--avfb-gold) 35%,transparent);transform:rotate(45deg)}
+.avfb-tip b{color:var(--avfb-gold-soft)}
+.avfb-tip button{margin-top:12px;background:none;border:1px solid var(--avfb-line);color:var(--avfb-ink);
+  border-radius:7px;padding:7px 14px;font:inherit;font-size:.82rem;cursor:pointer}
+.avfb-tip button:hover{border-color:var(--avfb-gold)}
+
+/* Ansichtsbalken (Betreiber sieht gespeicherte Rückmeldung) */
+.avfb-showbar{position:fixed;z-index:2147483400;top:0;left:0;right:0;display:flex;justify-content:center;align-items:center;gap:16px;
+  padding:10px 16px;background:rgba(18,18,20,.94);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+  border-bottom:1px solid color-mix(in srgb,var(--avfb-gold) 30%,transparent);color:var(--avfb-ink);
+  font-family:ui-monospace, SFMono-Regular, Menlo, monospace;font-size:.78rem;letter-spacing:.05em}
+.avfb-showbar button{background:var(--avfb-gold);border:none;color:var(--avfb-void);font-weight:600;font-family:var(--sans,system-ui);
+  padding:6px 14px;border-radius:7px;cursor:pointer;font-size:.8rem}
+
+/* Wiederhergestellt-Meldung */
+.avfb-toast{position:fixed;z-index:2147483450;left:50%;bottom:84px;transform:translate(-50%,10px);opacity:0;
+  background:var(--avfb-void);color:var(--avfb-ink);border:1px solid color-mix(in srgb,var(--avfb-gold) 35%,transparent);
+  padding:9px 16px;border-radius:999px;font-size:.82rem;transition:opacity .25s,transform .25s;pointer-events:none}
+.avfb-toast--in{opacity:1;transform:translate(-50%,0)}
+
+/* Schreibgeschütztes Popup im Ansichtsmodus */
+.avfb-pop--ro{width:240px;background:var(--avfb-dark);border:1px solid color-mix(in srgb,var(--avfb-gold) 35%,transparent);
+  border-radius:8px;padding:12px;box-shadow:0 18px 50px rgba(0,0,0,.6);font-size:.9rem;line-height:1.5;color:var(--avfb-ink);
+  position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%)}
+.avfb-pop--ro em{color:var(--avfb-mute)}
+
+/* Werkzeugleiste */
+.avfb-bar{position:fixed;z-index:2147483400;left:50%;bottom:max(18px,env(safe-area-inset-bottom));transform:translateX(-50%) translateY(140%);
+  display:flex;align-items:center;gap:4px;padding:8px;background:rgba(18,18,20,.94);
+  -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border:1px solid var(--avfb-line);
+  border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.55);transition:transform .28s cubic-bezier(.2,.8,.2,1)}
+.avfb-bar.avfb-in{transform:translateX(-50%) translateY(0)}
+.avfb-sep{width:1px;align-self:stretch;background:var(--avfb-line);margin:4px 6px}
+.avfb-tool{position:relative;width:44px;height:44px;border-radius:10px;border:1px solid transparent;background:none;color:var(--avfb-mute);
+  display:grid;place-items:center;cursor:pointer;transition:background .15s,color .15s,border-color .15s}
+.avfb-tool:hover{background:#ffffff0d;color:var(--avfb-ink)}
+.avfb-tool[aria-pressed="true"]{background:color-mix(in srgb,var(--avfb-gold) 20%,transparent);color:var(--avfb-gold-soft);border-color:color-mix(in srgb,var(--avfb-gold) 45%,transparent)}
+.avfb-tool:disabled{opacity:.32;cursor:not-allowed}
+.avfb-tool svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.avfb-lbl{position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);background:var(--avfb-void);color:var(--avfb-ink);
+  font-size:.68rem;font-family:ui-monospace, SFMono-Regular, Menlo, monospace;letter-spacing:.03em;white-space:nowrap;padding:5px 9px;border-radius:5px;
+  border:1px solid var(--avfb-line);opacity:0;pointer-events:none;transition:opacity .12s}
+.avfb-tool:hover .avfb-lbl{opacity:1}
+.avfb-count{font-family:ui-monospace, SFMono-Regular, Menlo, monospace;font-size:.72rem;color:var(--avfb-mute);padding:0 6px;min-width:26px;text-align:center}
+.avfb-done{margin-left:6px;height:44px;padding:0 18px;border-radius:10px;border:none;background:var(--avfb-gold);color:var(--avfb-void);
+  font:600 .9rem/1 var(--sans,system-ui);cursor:pointer;display:flex;align-items:center;gap:8px}
+.avfb-done:hover{background:var(--avfb-gold-soft)}
+.avfb-done svg{fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+
+/* Pins */
+.avfb-pin{position:absolute;z-index:2147483300;transform:translate(-50%,-100%)}
+.avfb-dot{width:30px;height:30px;border-radius:50% 50% 50% 2px;transform:rotate(45deg);background:var(--avfb-note);color:var(--avfb-void);
+  display:grid;place-items:center;box-shadow:0 4px 14px rgba(0,0,0,.45);cursor:pointer;border:2px solid #ffffff33}
+.avfb-num{transform:rotate(-45deg);font-family:ui-monospace, SFMono-Regular, Menlo, monospace;font-weight:600;font-size:.82rem}
+.avfb-pop{position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);width:240px;background:var(--avfb-dark);
+  border:1px solid color-mix(in srgb,var(--avfb-gold) 35%,transparent);border-radius:8px;padding:12px;box-shadow:0 18px 50px rgba(0,0,0,.6)}
+.avfb-pop textarea{width:100%;min-height:70px;resize:vertical;background:#0d0d0f;border:1px solid var(--avfb-line);color:var(--avfb-ink);
+  border-radius:5px;padding:8px;font:inherit;font-size:.9rem}
+.avfb-pop textarea:focus{outline:none;border-color:var(--avfb-gold)}
+.avfb-poprow{display:flex;justify-content:space-between;align-items:center;margin-top:8px}
+.avfb-del{background:none;border:none;color:var(--avfb-mute);font-size:.75rem;cursor:pointer;font-family:ui-monospace, SFMono-Regular, Menlo, monospace}
+.avfb-del:hover{color:#e5867a}
+.avfb-ok{background:var(--avfb-gold);border:none;color:var(--avfb-void);font-weight:600;font-size:.8rem;padding:6px 14px;border-radius:5px;cursor:pointer}
+
+/* Fertig-Fenster */
+.avfb-review{position:fixed;inset:0;z-index:2147483500;display:none;place-items:center;padding:20px;background:rgba(0,0,0,.72);
+  -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+.avfb-review.avfb-open{display:grid}
+.avfb-box{color:var(--avfb-ink);width:min(560px,100%);max-height:calc(100dvh - 40px);overflow-y:auto;background:var(--avfb-dark);
+  border:1px solid color-mix(in srgb,var(--avfb-gold) 30%,transparent);border-radius:14px;padding:clamp(22px,4vw,34px)}
+.avfb-kick{font-family:ui-monospace, SFMono-Regular, Menlo, monospace;font-size:.72rem;letter-spacing:.18em;text-transform:uppercase;color:var(--avfb-gold);margin:0 0 6px}
+.avfb-h{color:var(--avfb-ink);font-family:var(--mhf-font-display, Georgia, serif);font-weight:400;font-size:1.6rem;margin:0 0 8px}
+.avfb-name{width:100%;background:#0d0d0f;border:1px solid var(--avfb-line);color:var(--avfb-ink);border-radius:6px;padding:9px 11px;font:inherit;font-size:.9rem;margin:14px 0 4px}
+.avfb-name:focus{outline:none;border-color:var(--avfb-gold)}
+.avfb-item{display:grid;grid-template-columns:30px 1fr;gap:12px;padding:12px 0;border-top:1px solid var(--avfb-line)}
+.avfb-badge{width:26px;height:26px;border-radius:50%;background:color-mix(in srgb,var(--avfb-gold) 22%,transparent);color:var(--avfb-gold-soft);
+  display:grid;place-items:center;font-family:ui-monospace, SFMono-Regular, Menlo, monospace;font-size:.78rem}
+.avfb-itxt{color:var(--avfb-ink);font-size:.94rem;line-height:1.5}
+.avfb-imeta{font-family:ui-monospace, SFMono-Regular, Menlo, monospace;font-size:.66rem;color:var(--avfb-mute);letter-spacing:.05em;margin-top:3px}
+.avfb-empty{color:var(--avfb-mute);font-style:italic}
+.avfb-foot{display:flex;gap:10px;justify-content:flex-end;margin-top:22px;flex-wrap:wrap}
+.avfb-ghost{background:none;border:1px solid var(--avfb-line);color:var(--avfb-ink);padding:10px 16px;border-radius:8px;cursor:pointer;font:inherit}
+.avfb-ghost:hover{border-color:var(--avfb-gold)}
+.avfb-solid{background:var(--avfb-gold);border:none;color:var(--avfb-void);font-weight:600;padding:10px 20px;border-radius:8px;cursor:pointer;font:inherit}
+.avfb-solid:disabled{opacity:.5;cursor:default}
+
+@media (max-width:560px){
+  .avfb-bar{gap:2px;padding:6px}
+  .avfb-tool{width:38px;height:38px}
+  .avfb-count{display:none}
+}
+@media (prefers-reduced-motion:reduce){.avfb-bar{transition:none}.avfb-start{transition:none}}
+
+/* --- Zurückspiel-Modus (Betreiber sieht gespeicherte Rückmeldung) --- */
+.avfb-replay-bar{position:fixed;z-index:2147483450;top:0;left:0;right:0;display:flex;justify-content:center;align-items:center;gap:16px;
+  padding:10px 16px;background:rgba(12,12,13,.94);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+  border-bottom:1px solid color-mix(in srgb,var(--avfb-gold) 35%,transparent);
+  font-family:ui-monospace, SFMono-Regular, Menlo, monospace;font-size:.76rem;letter-spacing:.06em;color:var(--avfb-ink)}
+.avfb-replay-bar span{color:var(--avfb-gold-soft)}
+.avfb-replay-bar a{color:var(--avfb-mute);text-decoration:none}
+.avfb-replay-bar a:hover{color:var(--avfb-ink)}
+
+/* Read-only Kommentar im Zurückspiel-Modus: immer sichtbar, kein Eingabefeld. */
+.avfb-pop--ro{display:block !important;pointer-events:auto;font-size:.9rem;line-height:1.45;color:var(--avfb-ink);white-space:pre-wrap;word-break:break-word}
+.avfb-pop--ro em{color:var(--avfb-mute);font-style:italic}
+
+/* Startknopf: Markierung, wenn eine angefangene Sitzung wartet. */
+.avfb-start.avfb-has-draft::after{content:"";position:absolute;top:-3px;right:-3px;width:12px;height:12px;border-radius:50%;
+  background:var(--avfb-gold-soft);border:2px solid var(--avfb-void);box-shadow:0 0 0 1px var(--avfb-gold)}
+.avfb-start{position:fixed}
+
+/* Etwas höher gesetzt, damit der Knopf nicht mit dem Objektiv unten rechts
+   kollidiert. Die endgültige Position gehört auf der echten Seite geprüft. */
+@media (min-width:641px){ .avfb-start{bottom:calc(max(18px,env(safe-area-inset-bottom)) + 76px)} }
+
+
+/* Nachschärfung der Lesbarkeit: Felder heben sich deutlicher ab, Platzhalter
+   sind sichtbar, aber ruhig. */
+.avfb-name,
+.avfb-pop textarea{
+  background:#0f0f12;
+  color:var(--avfb-ink);
+  border-color:#3a3a40;
+}
+.avfb-name::placeholder,
+.avfb-pop textarea::placeholder{
+  color:#8f8a83;
+  opacity:1;
+}
+.avfb-name:focus,
+.avfb-pop textarea:focus{
+  border-color:var(--avfb-gold);
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--avfb-gold) 24%,transparent);
+}
+.avfb-imeta{color:#9a948c}
+.avfb-empty{color:#a8a29a}
+
+/* --------------------------------------------------------------------------
+   Zeiger: Manche Themes ersetzen den Mauszeiger durch eine eigene Grafik –
+   auf dunklem Grund ist die oft nicht zu sehen. Innerhalb des Werkzeugs gilt
+   deshalb wieder der gewohnte Zeiger des Systems.
+   -------------------------------------------------------------------------- */
+.avfb,
+.avfb *,
+.avfb-review,
+.avfb-review *,
+.avfb-pop,
+.avfb-pop *{
+  cursor:auto !important;
+}
+
+.avfb button,
+.avfb a,
+.avfb-review button,
+.avfb-start,
+.avfb-dot,
+.avfb-ok,
+.avfb-del,
+.avfb-ghost,
+.avfb-solid{
+  cursor:pointer !important;
+}
+
+.avfb input,
+.avfb textarea,
+.avfb-review input,
+.avfb-review textarea,
+.avfb-name,
+.avfb-pop textarea{
+  cursor:text !important;
+}
+
+/* Beim Markieren bleibt das Fadenkreuz – dort ist es die richtige Rückmeldung. */
+#avfb-layer.avfb-armed,
+#avfb-layer.avfb-armed *{
+  cursor:crosshair !important;
+}
+
+/* Abbrechen: bewusst zurückhaltend, damit „Fertig“ der klare Hauptweg bleibt. */
+.avfb-cancel{
+  display:inline-flex;align-items:center;gap:7px;margin-left:6px;
+  background:none;border:1px solid var(--avfb-line);color:var(--avfb-mute);
+  border-radius:999px;padding:8px 13px;font:inherit;font-size:.82rem;cursor:pointer;
+  transition:color .15s,border-color .15s;
+}
+.avfb-cancel:hover{color:var(--avfb-ink);border-color:#4a4a52}
+.avfb-cancel svg{fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round}
+.avfb-drop{margin-right:auto;color:var(--avfb-mute)}
+.avfb-drop:hover{color:#e5867a;border-color:#e5867a}
+
+@media (max-width:560px){
+  .avfb-cancel .avfb-lbl{display:none}
+  .avfb-cancel{padding:8px 10px}
+}
+
+/* Erklärung der Werkzeuge: kompakt, eine Zeile je Funktion. */
+.avfb-tip--hilfe{width:min(360px,calc(100vw - 32px));line-height:1.55}
+.avfb-tiplead{margin:6px 0 12px;color:var(--avfb-mute);font-size:.84rem}
+.avfb-hilfe{list-style:none;margin:0;padding:0;display:grid;gap:9px}
+.avfb-hilfe li{display:grid;grid-template-columns:20px 1fr;gap:10px;align-items:start;font-size:.84rem}
+.avfb-hilfe svg{width:18px;height:18px;fill:none;stroke:var(--avfb-gold);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;margin-top:1px}
+.avfb-hilfe b{color:var(--avfb-ink);font-weight:600}
+.avfb-hilfe span{color:var(--avfb-mute)}
+.avfb-tipfoot{margin:12px 0 0;padding-top:10px;border-top:1px solid var(--avfb-line);color:var(--avfb-mute);font-size:.8rem}
+.avfb-tipbtns{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.avfb-tip-skip{color:var(--avfb-mute) !important;border-color:transparent !important;text-decoration:underline}
+.avfb-tip-skip:hover{color:var(--avfb-ink) !important}
+.avfb-help svg{stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round}
