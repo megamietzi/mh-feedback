@@ -31,7 +31,7 @@
   const layer = root.querySelector('#avfb-layer');
   const svg = root.querySelector('#avfb-ink');
 
-  let bar = null, tool = 'view', seq = 0;
+  let bar = null, tool = 'view', seq = 0, sent = false;
   const items = [], redo = [];
   const replayPins = [];
 
@@ -45,6 +45,19 @@
   window.addEventListener('resize', sizeLayer);
   window.addEventListener('load', sizeLayer);
   sizeLayer();
+
+  /* Schutz vor versehentlichem Verlassen: Solange das Werkzeug offen ist und es
+     ungesendete Anmerkungen gibt, fragt der Browser vor dem Seitenwechsel /
+     Neuladen / Schließen nach. Erst nach „Abbrechen“ oder „Absenden“ ist der
+     Weg frei. (Browser erlauben nur diesen Bestätigungsdialog, kein hartes
+     Sperren – mehr ist technisch nicht möglich.) */
+  window.addEventListener('beforeunload', function (e) {
+    if (bar && items.length && !sent) {
+      e.preventDefault();
+      e.returnValue = '';
+      return '';
+    }
+  });
 
   function docPt(e) { const r = layer.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
@@ -358,6 +371,7 @@
     body.append('payload', JSON.stringify({ name: (rv.querySelector('#avfb-name') || {}).value || '', page: CFG.page, items: items.map(serialize) }));
     fetch(CFG.ajax, { method: 'POST', body, credentials: 'same-origin' }).then(r => r.json()).then(res => {
       if (!res || !res.success) throw 0;
+      sent = true; // Weg ist frei – kein Verlassen-Warnhinweis mehr.
       clearDraft();
       rv.querySelector('.avfb-box').innerHTML = '<p class="avfb-kick">' + esc(T.reviewKick) + '</p><h2 class="avfb-h">' + esc(T.thanks) + '</h2><p style="color:var(--on-dark,#a8a29a);line-height:1.6">' + esc(T.thanksSub) + '</p>';
     }).catch(() => { btn.disabled = false; btn.textContent = T.send; alert(T.failed); });
