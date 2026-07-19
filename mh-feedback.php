@@ -3,7 +3,7 @@
  * Plugin Name: MH Anmerkungen
  * Plugin URI:  https://www.mh-design.co.at
  * Description: Kunden hinterlassen Rückmeldungen direkt auf der Seite: Kommentare an Ort und Stelle, Markierungen, Einringelungen. Beim Absenden landet alles im Backend. Eigenständig, ohne Abhängigkeit von einem bestimmten Theme.
- * Version:     1.0.8
+ * Version:     1.0.9
  * Author:      MH-Design, Markus Habenreich
  * Author URI:  https://www.mh-design.co.at
  * License:     GPL-2.0-or-later
