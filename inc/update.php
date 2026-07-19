@@ -236,3 +236,18 @@ class MHF_GitHub_Updater {
 
 /* Updater starten (Haupt-Plugin-Datei liegt eine Ebene über /inc). */
 new MHF_GitHub_Updater( MHF_DIR . 'mh-feedback.php' );
+
+/*
+ * Auto-Update standardmäßig AN: Sobald eine Seite eine neue Version im Repo
+ * sieht, installiert WordPress sie im Hintergrund selbst – ohne Klick, auf
+ * allen Seiten. So wird ein Update praktisch „überall gleichzeitig“ ausgerollt
+ * (im nächsten WP-Prüf-Intervall, i. d. R. binnen ~12 h; sofort per
+ * „Dashboard → Aktualisierungen → Erneut prüfen“).
+ * Abschaltbar durch: define( 'MHF_NO_AUTOUPDATE', true ); in der wp-config.php.
+ */
+add_filter( 'auto_update_plugin', function ( $update, $item ) {
+	if ( ! defined( 'MHF_NO_AUTOUPDATE' ) && isset( $item->plugin ) && 'mh-feedback/mh-feedback.php' === $item->plugin ) {
+		return true;
+	}
+	return $update;
+}, 10, 2 );
