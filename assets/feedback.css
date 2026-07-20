@@ -155,8 +155,18 @@
 .avfb-replay-bar a{color:var(--avfb-mute);text-decoration:none}
 .avfb-replay-bar a:hover{color:var(--avfb-ink)}
 
-/* Read-only Kommentar im Zurückspiel-Modus: immer sichtbar, kein Eingabefeld. */
-.avfb-pop--ro{display:block !important;pointer-events:auto;font-size:.9rem;line-height:1.45;color:var(--avfb-ink);white-space:pre-wrap;word-break:break-word}
+/* Read-only Kommentar im Zurückspiel-Modus: klappt erst per Klick auf den Pin auf. */
+.avfb-pop--ro{display:none;pointer-events:auto;font-size:.9rem;line-height:1.45;color:var(--avfb-ink);white-space:pre-wrap;word-break:break-word;max-height:50vh;overflow:auto}
+.avfb-pin.avfb-open .avfb-pop--ro{display:block}
+/* Der offene Pin liegt über allen anderen, sonst überdecken ihn die Nachbarn. */
+.avfb-pin.avfb-open{z-index:2147483350}
+/* Pins bleiben klickbar, obwohl die Ebene selbst Klicks durchreicht. */
+#avfb-layer .avfb-pin,#avfb-layer .avfb-dot{pointer-events:auto}
+/* Zu wenig Platz nach oben: Zettel klappt nach unten. */
+.avfb-pin.avfb-pop--unten .avfb-pop--ro{bottom:auto;top:calc(100% + 8px)}
+/* Geschlossene Pins dezent, damit die Seite lesbar bleibt. */
+.avfb-pin .avfb-dot{transition:transform .15s ease,box-shadow .15s ease}
+.avfb-pin.avfb-open .avfb-dot{transform:rotate(45deg) scale(1.12);box-shadow:0 0 0 4px color-mix(in srgb,var(--avfb-note) 30%,transparent)}
 .avfb-pop--ro em{color:var(--avfb-mute);font-style:italic}
 
 /* Startknopf: Markierung, wenn eine angefangene Sitzung wartet. */
