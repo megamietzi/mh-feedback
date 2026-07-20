@@ -114,7 +114,7 @@ function mhf_admin_page() {
 			<p><?php esc_html_e( 'Noch keine Rückmeldungen. Sobald jemand auf „Fertig“ klickt, erscheinen sie hier.', 'mh-feedback' ); ?></p>
 		<?php else : ?>
 			<?php foreach ( $posts as $p ) :
-				$items = json_decode( (string) get_post_meta( $p->ID, '_mhf_items', true ), true );
+				$items = mhf_items( $p->ID );
 				$items = is_array( $items ) ? $items : array();
 				$page  = (string) get_post_meta( $p->ID, '_mhf_page', true );
 				$pins  = array_filter( $items, function ( $i ) { return 'pin' === ( $i['type'] ?? '' ); } );

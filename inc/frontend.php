@@ -102,8 +102,8 @@ function mhf_replay_data() {
 	if ( ! $id || MHF_CPT !== get_post_type( $id ) ) {
 		return null;
 	}
-	$items = json_decode( (string) get_post_meta( $id, '_mhf_items', true ), true );
-	if ( ! is_array( $items ) ) {
+	$items = mhf_items( $id );
+	if ( ! $items ) {
 		return null;
 	}
 	return array(

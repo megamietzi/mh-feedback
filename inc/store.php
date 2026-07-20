@@ -100,7 +100,10 @@ function mhf_submit() {
 		wp_send_json_error( 'save_failed', 500 );
 	}
 
-	update_post_meta( $id, '_mhf_items', wp_json_encode( $clean ) );
+	// wp_slash: update_post_meta entschlackt den Wert intern per wp_unslash.
+	// Ohne slash verschwinden die Backslashes aus dem JSON – aus \u00e4 wird u00e4.
+	// JSON_UNESCAPED_UNICODE schreibt Umlaute ohnehin direkt als UTF-8.
+	update_post_meta( $id, '_mhf_items', wp_slash( wp_json_encode( $clean, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ) ) );
 	update_post_meta( $id, '_mhf_page', $page );
 	update_post_meta( $id, '_mhf_name', $name );
 
@@ -166,5 +169,52 @@ function mhf_notify( $id, $name, $page, $items ) {
 			'Content-Type: text/plain; charset=UTF-8',
 			'From: ' . get_bloginfo( 'name' ) . ' <noreply@' . $host . '>',
 		)
+	);
+}
+
+/**
+ * Anmerkungen einer Rückmeldung lesen.
+ *
+ * Repariert nebenbei Altbestände, bei denen die Backslashes der \uXXXX-Folgen
+ * verloren gingen (aus „wählt“ wurde „wu00e4hlt“).
+ *
+ * @param int $id Beitrags-ID.
+ * @return array
+ */
+function mhf_items( $id ) {
+	$items = json_decode( (string) get_post_meta( $id, '_mhf_items', true ), true );
+	if ( ! is_array( $items ) ) {
+		return array();
+	}
+	foreach ( $items as $k => $it ) {
+		if ( isset( $it['text'] ) ) {
+			$items[ $k ]['text'] = mhf_repariere_umlaute( (string) $it['text'] );
+		}
+		if ( isset( $it['anchor'] ) ) {
+			$items[ $k ]['anchor'] = mhf_repariere_umlaute( (string) $it['anchor'] );
+		}
+	}
+	return $items;
+}
+
+/**
+ * Entschärfte uXXXX-Reste zurück in echte Zeichen wandeln.
+ *
+ * Nur oberhalb von U+007F, damit normaler Text („u0815“) unangetastet bleibt.
+ *
+ * @param string $text Text.
+ * @return string
+ */
+function mhf_repariere_umlaute( $text ) {
+	if ( false === strpos( $text, 'u00' ) && ! preg_match( '/u[0-9a-fA-F]{4}/', $text ) ) {
+		return $text;
+	}
+	return preg_replace_callback(
+		'/u([0-9a-fA-F]{4})/',
+		function ( $m ) {
+			$code = hexdec( $m[1] );
+			return $code >= 0x80 ? mb_chr( $code, 'UTF-8' ) : $m[0];
+		},
+		$text
 	);
 }
