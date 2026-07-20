@@ -100,6 +100,22 @@
 
   function mk(tag, attrs) { const el = document.createElementNS(SVGNS, tag); for (const k in attrs) el.setAttribute(k, attrs[k]); svg.appendChild(el); return el; }
 
+  /* ---------- Zettel im Zurückspiel-Modus ---------- */
+  function closeAllPins() {
+    layer.querySelectorAll('.avfb-pin.avfb-open').forEach(p => {
+      p.classList.remove('avfb-open', 'avfb-pop--unten');
+    });
+  }
+
+  // Kein Platz nach oben? Dann klappt der Zettel nach unten auf.
+  function platziereZettel(el) {
+    const pop = el.querySelector('.avfb-pop--ro');
+    if (!pop) return;
+    el.classList.remove('avfb-pop--unten');
+    const r = pop.getBoundingClientRect();
+    if (r.top < 56) el.classList.add('avfb-pop--unten');
+  }
+
   /* ---------- Pin rendern ---------- */
   function renderPin(rec, replay, openNow) {
     const el = document.createElement('div');
@@ -110,7 +126,17 @@
         ? '<div class="avfb-pop avfb-pop--ro">' + (rec.text ? esc(rec.text) : '<em>' + esc(T.noText) + '</em>') + '</div>'
         : '<div class="avfb-pop"><textarea placeholder="' + esc(T.placeholder) + '"></textarea><div class="avfb-poprow"><button class="avfb-del">' + esc(T.delete) + '</button><button class="avfb-ok">' + esc(T.apply) + '</button></div></div>');
     layer.appendChild(el);
-    if (replay) return el;
+
+    // Zurückspiel-Modus: Zettel steckt im Pin und klappt erst auf Klick auf.
+    if (replay) {
+      el.querySelector('.avfb-dot').addEventListener('click', ev => {
+        ev.preventDefault(); ev.stopPropagation();
+        const warOffen = el.classList.contains('avfb-open');
+        closeAllPins();
+        if (!warOffen) { el.classList.add('avfb-open'); platziereZettel(el); }
+      });
+      return el;
+    }
 
     const dot = el.querySelector('.avfb-dot'), pop = el.querySelector('.avfb-pop'), ta = el.querySelector('textarea');
     let open = !!openNow; show(open);
@@ -169,6 +195,13 @@
     root.appendChild(b);
     buildAll(REPLAY.items, true);
     place();
+    document.addEventListener('click', () => closeAllPins());
+    document.addEventListener('keydown', ev => { if (ev.key === 'Escape') closeAllPins(); });
+    window.addEventListener('resize', () => {
+      place();
+      const offen = layer.querySelector('.avfb-pin.avfb-open');
+      if (offen) platziereZettel(offen);
+    });
     return;
   }
 
