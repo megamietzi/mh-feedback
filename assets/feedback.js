@@ -36,7 +36,20 @@
   const replayPins = [];
 
   function sizeLayer() {
-    const h = Math.max(document.documentElement.scrollHeight, document.body.scrollHeight);
+    /*
+     * Erst auf null setzen: Die Ebene liegt selbst im Dokument und würde sonst
+     * in die eigene Messung einfließen. Ohne diesen Schritt wächst sie bei
+     * jeder Messung ein Stück – sichtbar als leerer Raum unter dem Fußbereich.
+     */
+    layer.style.height = '0px';
+    svg.style.height = '0px';
+
+    const h = Math.max(
+      document.body.scrollHeight,
+      document.body.offsetHeight,
+      document.documentElement.offsetHeight
+    );
+
     layer.style.height = h + 'px';
     svg.style.height = h + 'px';
     svg.setAttribute('viewBox', '0 0 ' + window.innerWidth + ' ' + h);

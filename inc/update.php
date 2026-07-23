@@ -19,7 +19,9 @@ add_action( 'admin_init', function () {
 	register_setting( 'mhf', 'mhf_gh_repo', array(
 		'type'              => 'string',
 		'sanitize_callback' => 'mhf_sanitize_repo',
-		'default'           => '',
+		// Voreingestellt, damit nach dem Einspielen nichts eingetragen werden
+		// muss. Das Feld bleibt änderbar – etwa bei einem Umzug des Repos.
+		'default'           => 'megamietzi/mh-feedback',
 	) );
 	register_setting( 'mhf', 'mhf_gh_token', array(
 		'type'              => 'string',
@@ -61,7 +63,7 @@ class MHF_GitHub_Updater {
 		$this->file   = $file;
 		$this->slug   = plugin_basename( $file );
 		$this->folder = dirname( $this->slug );
-		$this->repo   = (string) get_option( 'mhf_gh_repo', '' );
+		$this->repo   = (string) get_option( 'mhf_gh_repo' );
 		$this->token  = (string) get_option( 'mhf_gh_token', '' );
 
 		if ( ! $this->repo ) {
@@ -107,7 +109,7 @@ class MHF_GitHub_Updater {
 			return $cache ? $cache : null;
 		}
 
-		$branch = (string) get_option( 'mhf_gh_branch', 'main' );
+		$branch = (string) get_option( 'mhf_gh_branch' );
 		if ( ! $branch ) {
 			$branch = 'main';
 		}
