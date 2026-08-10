@@ -83,9 +83,15 @@ function mhf_admin_page() {
 				<tr>
 					<th scope="row"><?php esc_html_e( 'Benachrichtigung an', 'mh-feedback' ); ?></th>
 					<td>
-						<input type="text" name="mhf_notify_to" class="regular-text" value="<?php echo esc_attr( get_option( 'mhf_notify_to' ) ); ?>" placeholder="<?php echo esc_attr( get_option( 'admin_email' ) ); ?>">
+						<input type="text" name="mhf_notify_to" class="regular-text" value="<?php echo esc_attr( get_option( 'mhf_notify_to' ) ); ?>" placeholder="<?php echo esc_attr( defined( 'MHF_NOTIFY_FALLBACK' ) ? MHF_NOTIFY_FALLBACK : '' ); ?>">
 						<p class="description" style="max-width:70ch">
-							<?php esc_html_e( 'An diese Adresse geht eine E-Mail, sobald hier jemand eine Rückmeldung absendet – so bist du auch auf Kundenseiten sofort informiert. Der Seitenname steht im Betreff. Mehrere Adressen durch Komma trennen. Leer = Admin-E-Mail dieser Seite.', 'mh-feedback' ); ?>
+							<?php
+							printf(
+								/* translators: %s: eingebaute Standard-Adresse */
+								esc_html__( 'An diese Adresse geht eine E-Mail, sobald hier jemand eine Rückmeldung absendet – mit den Kommentaren und dem direkten Link zur Seite. Der Seitenname steht im Betreff. Mehrere Adressen durch Komma trennen. Leer = die Nachricht geht an %s.', 'mh-feedback' ),
+								esc_html( defined( 'MHF_NOTIFY_FALLBACK' ) ? MHF_NOTIFY_FALLBACK : '' )
+							);
+							?>
 						</p>
 					</td>
 				</tr>

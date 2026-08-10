@@ -3,7 +3,7 @@
  * Plugin Name: MH Anmerkungen
  * Plugin URI:  https://www.mh-design.co.at
  * Description: Kunden hinterlassen Rückmeldungen direkt auf der Seite: Kommentare an Ort und Stelle, Markierungen, Einringelungen. Beim Absenden landet alles im Backend. Eigenständig, ohne Abhängigkeit von einem bestimmten Theme.
- * Version:     1.0.12
+ * Version:     1.0.13
  * Author:      MH-Design, Markus Habenreich
  * Author URI:  https://www.mh-design.co.at
  * License:     GPL-2.0-or-later
@@ -13,6 +13,15 @@
  */
 
 defined( 'ABSPATH' ) || exit;
+
+// Wohin die Benachrichtigung geht, wenn auf einer Seite KEINE eigene Adresse
+// eingetragen ist: immer an MH-Design. So kommt jede Rückmeldung von jeder
+// Kundenseite sofort bei Markus an, ohne dass dort etwas einzustellen wäre.
+// Übersteuerbar pro Seite in der wp-config.php:
+//   define( 'MHF_NOTIFY_FALLBACK', 'andere@adresse.at' );
+if ( ! defined( 'MHF_NOTIFY_FALLBACK' ) ) {
+	define( 'MHF_NOTIFY_FALLBACK', 'kontakt@mh-design.co.at' );
+}
 
 // Version wird automatisch aus der „Version:“-Zeile oben gelesen – du musst also
 // nur EINE Zahl (im Kopf dieser Datei) ändern, sonst nichts.

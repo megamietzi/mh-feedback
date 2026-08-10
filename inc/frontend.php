@@ -90,6 +90,17 @@ add_action( 'wp_enqueue_scripts', function () {
 } );
 
 /**
+ * Wer dem ?mhf_show-Link aus der Benachrichtigungs-Mail abgemeldet folgt,
+ * würde die Seite ohne die Kommentare sehen – und sich wundern. Darum geht es
+ * erst zum Login und danach automatisch auf dieselbe Adresse zurück.
+ */
+add_action( 'template_redirect', function () {
+	if ( isset( $_GET['mhf_show'] ) && ! is_user_logged_in() ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- reiner Lesezugriff, auth_redirect prüft selbst
+		auth_redirect();
+	}
+}, 2 );
+
+/**
  * Zurückspielen: eine gespeicherte Rückmeldung über die Seite legen.
  *
  * Nur für angemeldete Redakteure und nur mit ?mhf_show=ID.

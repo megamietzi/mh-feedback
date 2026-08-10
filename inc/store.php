@@ -83,6 +83,17 @@ function mhf_submit() {
 	$name = sanitize_text_field( mb_substr( (string) ( $data['name'] ?? '' ), 0, 80 ) );
 	$page = esc_url_raw( (string) ( $data['page'] ?? '' ) );
 
+	// Die Seitenadresse kommt vom Browser des Absenders und wandert später als
+	// anklickbarer Link in Mail und Backend – fremde Ziele haben dort nichts
+	// verloren. Nur die eigene Domain (mit oder ohne www) wird übernommen.
+	if ( $page ) {
+		$eigen  = strtolower( preg_replace( '/^www\./', '', (string) wp_parse_url( home_url(), PHP_URL_HOST ) ) );
+		$seite  = strtolower( preg_replace( '/^www\./', '', (string) wp_parse_url( $page, PHP_URL_HOST ) ) );
+		if ( '' === $seite || $seite !== $eigen ) {
+			$page = '';
+		}
+	}
+
 	$title = wp_date( 'j.n.Y H:i' );
 	if ( $name ) {
 		$title = $name . ' — ' . $title;
@@ -122,7 +133,7 @@ function mhf_submit() {
 function mhf_notify( $id, $name, $page, $items ) {
 	// Einstellbarer Empfänger: So bekommst DU die Info auf jeder Seite an deine
 	// Adresse – unabhängig davon, wer dort Admin ist. Mehrere durch Komma trennen.
-	// Leer = Fallback auf die Admin-E-Mail der Seite.
+	// Leer = eingebaute MH-Design-Adresse (MHF_NOTIFY_FALLBACK, Haupt-Plugin-Datei).
 	$konfig = trim( (string) get_option( 'mhf_notify_to', '' ) );
 	$to     = array();
 	if ( $konfig ) {
@@ -133,11 +144,8 @@ function mhf_notify( $id, $name, $page, $items ) {
 			}
 		}
 	}
-	if ( ! $to ) {
-		$admin = get_option( 'admin_email' );
-		if ( $admin ) {
-			$to[] = $admin;
-		}
+	if ( ! $to && defined( 'MHF_NOTIFY_FALLBACK' ) && is_email( MHF_NOTIFY_FALLBACK ) ) {
+		$to[] = MHF_NOTIFY_FALLBACK;
 	}
 	if ( ! $to ) {
 		return;
@@ -157,13 +165,32 @@ function mhf_notify( $id, $name, $page, $items ) {
 	if ( $marks > 0 ) {
 		$body .= sprintf( "\nDazu %d Markierung(en) auf der Seite.\n", $marks );
 	}
-	$body .= sprintf( "\nAnsehen: %s\n", admin_url( 'admin.php?page=mhf' ) );
+
+	// Direkt zur Seite, auf der die Kommentare liegen – ?mhf_show legt die
+	// Pins und Markierungen über die Live-Seite. Sichtbar nur für angemeldete
+	// Redakteure; Abgemeldete schickt frontend.php erst zum Login und danach
+	// automatisch hierher zurück.
+	if ( $page ) {
+		$body .= sprintf( "\nDirekt auf der Seite ansehen:\n%s\n", add_query_arg( 'mhf_show', (int) $id, $page ) );
+	}
+	$body .= sprintf( "\nAlle Rückmeldungen im Backend:\n%s\n", admin_url( 'admin.php?page=mhf' ) );
 
 	$host = preg_replace( '/^www\./', '', (string) wp_parse_url( home_url(), PHP_URL_HOST ) );
 
+	$anzahl  = count( $lines );
+	$betreff = $anzahl
+		? sprintf(
+			/* translators: 1: Seitenname, 2: Anzahl Kommentare */
+			_n( '[%1$s] Neue Rückmeldung – %2$d Kommentar', '[%1$s] Neue Rückmeldung – %2$d Kommentare', $anzahl, 'mh-feedback' ),
+			get_bloginfo( 'name' ),
+			$anzahl
+		)
+		/* translators: %s: Seitenname */
+		: sprintf( __( '[%s] Neue Rückmeldung', 'mh-feedback' ), get_bloginfo( 'name' ) );
+
 	wp_mail(
 		$to,
-		sprintf( '[%s] Rückmeldung', get_bloginfo( 'name' ) ),
+		$betreff,
 		$body,
 		array(
 			'Content-Type: text/plain; charset=UTF-8',
