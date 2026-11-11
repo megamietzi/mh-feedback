@@ -138,6 +138,10 @@
 .avfb-ghost:hover{border-color:var(--avfb-gold)}
 .avfb-solid{background:var(--avfb-gold);border:none;color:var(--avfb-void);font-weight:600;padding:10px 20px;border-radius:8px;cursor:pointer;font:inherit}
 .avfb-solid:disabled{opacity:.5;cursor:default}
+/* Danke-Fenster: kurzer Satz, darunter „Weiter ansehen“. */
+.avfb-sub{color:var(--avfb-mute);line-height:1.6;margin:0}
+.avfb-review--danke .avfb-foot{margin-top:18px}
+.avfb-solid:focus-visible,.avfb-ghost:focus-visible{outline:2px solid var(--avfb-gold-soft);outline-offset:2px}
 
 @media (max-width:560px){
   .avfb-bar{gap:2px;padding:6px}

@@ -311,8 +311,18 @@
    */
   function abbrechen() {
     if (items.length && !window.confirm(T.cancelAsk)) return;
-    items.slice().forEach(r => { if (r.el && r.el.parentNode) r.el.parentNode.removeChild(r.el); });
-    items.length = 0; redo.length = 0;
+    aufraeumen();
+  }
+
+  /**
+   * Werkzeug schließen und die Seite wieder freigeben: Pins und Zeichnungen
+   * weg, Leiste und Fenster zu, Startknopf wieder da. Danach lässt sich die
+   * Seite normal weiter ansehen und jederzeit eine neue Rückmeldung beginnen.
+   */
+  function aufraeumen() {
+    items.slice().concat(redo).forEach(r => { if (r.el && r.el.parentNode) r.el.parentNode.removeChild(r.el); });
+    items.length = 0; redo.length = 0; seq = 0;
+    sent = false; // Eine neue Rückmeldung ist wieder vor versehentlichem Verlassen geschützt.
     clearDraft();
     if (bar) { bar.remove(); bar = null; }
     const rv = root.querySelector('.avfb-review'); if (rv) rv.remove();
@@ -419,8 +429,34 @@
       if (!res || !res.success) throw 0;
       sent = true; // Weg ist frei – kein Verlassen-Warnhinweis mehr.
       clearDraft();
-      rv.querySelector('.avfb-box').innerHTML = '<p class="avfb-kick">' + esc(T.reviewKick) + '</p><h2 class="avfb-h">' + esc(T.thanks) + '</h2><p style="color:var(--on-dark,#a8a29a);line-height:1.6">' + esc(T.thanksSub) + '</p>';
+      danke(rv);
     }).catch(() => { btn.disabled = false; btn.textContent = T.send; alert(T.failed); });
+  }
+
+  /**
+   * Danke-Fenster nach dem Absenden. „Weiter ansehen“ (oder ein Klick daneben,
+   * oder Esc) schließt es und gibt die Seite frei – niemand muss dafür das
+   * Browserfenster schließen.
+   */
+  function danke(rv) {
+    rv.classList.add('avfb-review--danke');
+    rv.querySelector('.avfb-box').innerHTML =
+      '<p class="avfb-kick">' + esc(T.reviewKick) + '</p>' +
+      '<h2 class="avfb-h">' + esc(T.thanks) + '</h2>' +
+      '<p class="avfb-sub">' + esc(T.thanksSub) + '</p>' +
+      '<div class="avfb-foot"><button type="button" class="avfb-solid" id="avfb-weiter">' + esc(T.goOn || 'Weiter ansehen') + '</button></div>';
+
+    const weiter = rv.querySelector('#avfb-weiter');
+    function schliessen() {
+      document.removeEventListener('keydown', taste);
+      aufraeumen();
+    }
+    function taste(ev) { if (ev.key === 'Escape') schliessen(); }
+
+    weiter.addEventListener('click', schliessen);
+    rv.addEventListener('click', ev => { if (ev.target === rv) schliessen(); });
+    document.addEventListener('keydown', taste);
+    weiter.focus();
   }
   function serialize(r) {
     if (r.type === 'pin') return { type: 'pin', n: r.n, text: r.text, anchor: r.anchor, selector: r.selector, ax: r.ax, ay: r.ay, x: r.x, y: r.y };
