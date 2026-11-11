@@ -444,7 +444,7 @@
       '<p class="avfb-kick">' + esc(T.reviewKick) + '</p>' +
       '<h2 class="avfb-h">' + esc(T.thanks) + '</h2>' +
       '<p class="avfb-sub">' + esc(T.thanksSub) + '</p>' +
-      '<div class="avfb-foot"><button type="button" class="avfb-solid" id="avfb-weiter">' + esc(T.goOn || 'Weiter ansehen') + '</button></div>';
+      '<div class="avfb-foot"><button class="avfb-solid" id="avfb-weiter">' + esc(T.goOn || 'Weiter ansehen') + '</button></div>';
 
     const weiter = rv.querySelector('#avfb-weiter');
     function schliessen() {
