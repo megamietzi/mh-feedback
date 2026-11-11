@@ -143,7 +143,8 @@
 .avfb-review--danke .avfb-foot{margin-top:18px}
 .avfb-solid:focus-visible,.avfb-ghost:focus-visible{outline:2px solid var(--avfb-gold-soft);outline-offset:2px}
 
-@media (max-width:560px){
+/* Die volle Leiste ist gut 600 px breit: darunter rückt sie enger zusammen. */
+@media (max-width:660px){
   .avfb-bar{gap:2px;padding:6px}
   .avfb-tool{width:38px;height:38px}
   .avfb-count{display:none}
@@ -257,7 +258,7 @@
 .avfb-drop{margin-right:auto;color:var(--avfb-mute)}
 .avfb-drop:hover{color:#e5867a;border-color:#e5867a}
 
-@media (max-width:560px){
+@media (max-width:660px){
   .avfb-cancel .avfb-lbl{display:none}
   .avfb-cancel{padding:8px 10px}
 }
@@ -275,3 +276,16 @@
 .avfb-tip-skip{color:var(--avfb-mute) !important;border-color:transparent !important;text-decoration:underline}
 .avfb-tip-skip:hover{color:var(--avfb-ink) !important}
 .avfb-help svg{stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round}
+
+/* Handy: Auch eng passt die Leiste nicht in eine Zeile, „Ansehen“ und
+   „Fertig“ lagen links und rechts außerhalb des Bildschirms. Darum zwei
+   Zeilen: oben die Werkzeuge, unten Rückgängig, Wiederholen, Hilfe,
+   Abbrechen und ein breiter „Fertig“-Knopf. Es fällt nichts weg. */
+@media (max-width:540px){
+  .avfb-bar{flex-wrap:wrap;width:min(360px,calc(100vw - 24px));row-gap:6px;column-gap:4px}
+  .avfb-bar > div:first-child{flex:1 1 100%;justify-content:space-between}
+  .avfb-sep{display:none}
+  .avfb-tool{width:40px;height:40px}
+  .avfb-cancel{margin-left:0;width:40px;height:40px;padding:0;justify-content:center}
+  .avfb-done{flex:1 1 auto;margin-left:0;height:40px;justify-content:center}
+}
