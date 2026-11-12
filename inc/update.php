@@ -1,11 +1,11 @@
 <?php
 /**
- * Automatische Updates über GitHub-Releases.
+ * Automatische Updates über GitHub.
  *
- * Sobald in den Einstellungen ein Repository (benutzer/repo) hinterlegt ist,
- * prüft WordPress dort auf neue Releases und zeigt „Update verfügbar“ – genau
- * wie bei Plugins aus dem offiziellen Verzeichnis. Neue Version veröffentlichen
- * heißt dann nur noch: auf GitHub einen Release mit Versions-Tag anlegen.
+ * WordPress fragt im Repository (benutzer/repo) nach der „Version:“-Zeile der
+ * Haupt-Datei und zeigt „Update verfügbar“ – genau wie bei Plugins aus dem
+ * offiziellen Verzeichnis. Ohne Eintrag in den Einstellungen gilt
+ * MHF_GH_REPO_DEFAULT, es muss also auf keiner Seite etwas eingetragen werden.
  *
  * Öffentliches Repo → Token bleibt leer. Privates Repo → Personal Access Token.
  *
@@ -14,14 +14,19 @@
 
 defined( 'ABSPATH' ) || exit;
 
+if ( ! defined( 'MHF_GH_REPO_DEFAULT' ) ) {
+	define( 'MHF_GH_REPO_DEFAULT', 'megamietzi/mh-feedback' );
+}
+
 /* Einstellungen registrieren (Repo + optionaler Token). */
 add_action( 'admin_init', function () {
 	register_setting( 'mhf', 'mhf_gh_repo', array(
 		'type'              => 'string',
 		'sanitize_callback' => 'mhf_sanitize_repo',
-		// Voreingestellt, damit nach dem Einspielen nichts eingetragen werden
-		// muss. Das Feld bleibt änderbar – etwa bei einem Umzug des Repos.
-		'default'           => 'megamietzi/mh-feedback',
+		// Nur für die Anzeige im Formular. Der Updater selbst liest die Vorgabe
+		// aus MHF_GH_REPO_DEFAULT, weil er vor admin_init startet und im Cron
+		// gar kein admin_init läuft.
+		'default'           => MHF_GH_REPO_DEFAULT,
 	) );
 	register_setting( 'mhf', 'mhf_gh_token', array(
 		'type'              => 'string',
@@ -63,11 +68,14 @@ class MHF_GitHub_Updater {
 		$this->file   = $file;
 		$this->slug   = plugin_basename( $file );
 		$this->folder = dirname( $this->slug );
-		$this->repo   = (string) get_option( 'mhf_gh_repo' );
+		$this->repo   = (string) get_option( 'mhf_gh_repo', '' );
 		$this->token  = (string) get_option( 'mhf_gh_token', '' );
 
+		// Bis 1.0.15 blieb der Updater ohne gespeicherte Einstellung stumm, weil
+		// die Vorgabe aus register_setting() hier noch nicht gilt. Darum hier
+		// selbst auf die Vorgabe zurückfallen.
 		if ( ! $this->repo ) {
-			return; // Nicht konfiguriert → Updater bleibt inaktiv.
+			$this->repo = MHF_GH_REPO_DEFAULT;
 		}
 
 		add_filter( 'pre_set_site_transient_update_plugins', array( $this, 'check' ) );
@@ -238,6 +246,17 @@ class MHF_GitHub_Updater {
 
 /* Updater starten (Haupt-Plugin-Datei liegt eine Ebene über /inc). */
 new MHF_GitHub_Updater( MHF_DIR . 'mh-feedback.php' );
+
+/*
+ * „Dashboard → Aktualisierungen → Erneut prüfen“ soll wirklich neu bei GitHub
+ * nachsehen. Sonst antwortet bis zu 12 h (nach einem Fehler 6 h) der eigene
+ * Zwischenspeicher. Priorität 1: vor wp_update_plugins() auf demselben Hook.
+ */
+add_action( 'load-update-core.php', function () {
+	if ( ! empty( $_GET['force-check'] ) && current_user_can( 'update_plugins' ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- löscht nur einen Zwischenspeicher
+		delete_transient( 'mhf_gh_latest' );
+	}
+}, 1 );
 
 /*
  * Auto-Update standardmäßig AN: Sobald eine Seite eine neue Version im Repo
