@@ -76,6 +76,20 @@
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
   function round(n) { return Math.round(n * 1000) / 1000; }
 
+  /* ---------- Zeichen von MH-Design ---------- */
+  const MH_PFAD = 'M215.39,707.55h-72.74v-475.1h100.02l68.08,271.03l28.53,-271.03h151.17v475.1h-81.84v-442.71l-46.6,442.71h-100.02l-46.6,-185.52zM542.73,232.45h81.84v204.59h90.93v-204.59h81.84v475.1h-81.84v-197.77h-90.93v197.77h-81.84z';
+  let zeichenNr = 0;
+  /** Platte mit MH, darüber die bunte Fassung, die beim Zeigen erscheint. Jede bekommt ihren eigenen Verlauf: Ein Verlauf aus einem ausgeblendeten SVG wird nicht gezeichnet. */
+  function zeichen() {
+    const id = 'avfb-verlauf-' + (++zeichenNr);
+    return '<span class="avfb-zeichen" aria-hidden="true">' +
+      '<svg viewBox="0 0 940 940" focusable="false"><path fill="#E4DFD6" d="M0 0h940v940H0z"/><path fill="#24221F" d="' + MH_PFAD + '"/></svg>' +
+      '<svg class="avfb-bunt" viewBox="0 0 940 940" focusable="false"><defs><linearGradient id="' + id + '" gradientUnits="userSpaceOnUse" x1="142" y1="0" x2="797" y2="0"><stop offset="0" stop-color="#FF5E7E"/><stop offset=".5" stop-color="#A855F7"/><stop offset="1" stop-color="#4F7BFF"/></linearGradient></defs>' +
+      '<path fill="#1B1917" d="M0 0h940v940H0z"/><path fill="url(#' + id + ')" d="' + MH_PFAD + '"/></svg></span>';
+  }
+  /** Erklärungen standen früher hinter einem Gedankenstrich, heute in einer eigenen Zeile. Eigene Texte der Seiten können ihn noch haben. */
+  function satz(s) { s = String(s == null ? '' : s).replace(/^\s*[\u2013\u2014-]\s*/, ''); return s.charAt(0).toUpperCase() + s.slice(1); }
+
   /* ---------- Verankerung ---------- */
   function anchorFor(cx, cy) {
     const prev = layer.style.pointerEvents;
@@ -85,12 +99,29 @@
     if (!el || el === document.body || el === document.documentElement) return { label: '—', selector: 'body', ax: 0, ay: 0 };
     const r = el.getBoundingClientRect();
     return {
-      label: ((el.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 60)) || el.tagName.toLowerCase(),
+      label: nameVon(el),
       selector: cssPath(el),
       ax: round(r.width ? (cx - r.left) / r.width : 0),
       ay: round(r.height ? (cy - r.top) / r.height : 0)
     };
   }
+  /** Wie die Stelle in der Rückmeldung heißt: ihr Text, sonst Bildbeschreibung oder Beschriftung, sonst was es ist. */
+  function nameVon(el) {
+    const kurz = s => String(s || '').trim().replace(/\s+/g, ' ').slice(0, 60);
+    const bild = el.matches('img') ? el : (el.matches('picture') ? el.querySelector('img') : null);
+    const beschriftet = el.closest('[aria-label]');
+    const arten = { img: 'Bild', picture: 'Bild', svg: 'Grafik', canvas: 'Grafik', video: 'Video', iframe: 'Eingebetteter Inhalt', input: 'Eingabefeld', textarea: 'Eingabefeld', select: 'Auswahl', button: 'Knopf', a: 'Link' };
+    const art = el.ownerSVGElement ? 'svg' : el.tagName.toLowerCase();
+    // Überschriften bestehen manchmal aus einzelnen Buchstaben: dann zählt, was darum herum steht.
+    let text = el.ownerSVGElement ? '' : kurz(el.innerText || el.textContent), n = el;
+    for (let i = 0; i < 3 && text.length && text.length < 3 && n.parentElement && n.parentElement !== document.body; i++) { n = n.parentElement; text = kurz(n.innerText); }
+    return text ||
+      (bild && kurz(bild.alt) ? 'Bild: ' + kurz(bild.alt) : '') ||
+      (beschriftet && beschriftet.contains(el) && beschriftet !== document.body ? kurz(beschriftet.getAttribute('aria-label')) : '') ||
+      arten[art] || 'Fläche';
+  }
+  /** Ältere Einträge tragen noch das nackte HTML-Kürzel („img“, „div“): das sagt niemandem etwas. */
+  function ortsname(s) { s = String(s || ''); return /^(—|[a-z][a-z0-9-]{0,11})$/.test(s) && (s === '—' || document.createElement(s).toString() !== '[object HTMLUnknownElement]') ? '' : s; }
   function cssPath(el) {
     if (el.id) return '#' + el.id;
     const parts = []; let n = el;
@@ -120,13 +151,18 @@
     });
   }
 
-  // Kein Platz nach oben? Dann klappt der Zettel nach unten auf.
+  // Kein Platz nach oben? Dann klappt der Zettel nach unten auf. Am Rand rückt er
+  // zur Seite, sonst wäre er am Handy halb außerhalb.
   function platziereZettel(el) {
-    const pop = el.querySelector('.avfb-pop--ro');
+    const pop = el.querySelector('.avfb-pop');
     if (!pop) return;
     el.classList.remove('avfb-pop--unten');
-    const r = pop.getBoundingClientRect();
-    if (r.top < 56) el.classList.add('avfb-pop--unten');
+    pop.style.removeProperty('--avfb-schub');
+    let r = pop.getBoundingClientRect();
+    if (r.top < (REPLAY ? 56 : 8)) { el.classList.add('avfb-pop--unten'); r = pop.getBoundingClientRect(); }
+    const breite = document.documentElement.clientWidth, rand = 8;
+    const schub = r.left < rand ? rand - r.left : (r.right > breite - rand ? breite - rand - r.right : 0);
+    if (schub) pop.style.setProperty('--avfb-schub', Math.round(schub) + 'px');
   }
 
   /* ---------- Pin rendern ---------- */
@@ -153,7 +189,7 @@
 
     const dot = el.querySelector('.avfb-dot'), pop = el.querySelector('.avfb-pop'), ta = el.querySelector('textarea');
     let open = !!openNow; show(open);
-    function show(v) { pop.style.display = v ? 'block' : 'none'; if (v) { ta.value = rec.text; setTimeout(() => ta.focus(), 0); } }
+    function show(v) { pop.style.display = v ? 'block' : 'none'; if (v) { ta.value = rec.text; platziereZettel(el); setTimeout(() => ta.focus({ preventScroll: true }), 0); } }
 
     let dragging = false, moved = false, sx = 0, sy = 0, ox = 0, oy = 0;
     dot.addEventListener('pointerdown', ev => { ev.stopPropagation(); dragging = true; moved = false; sx = ev.clientX; sy = ev.clientY; ox = rec.x; oy = rec.y; dot.setPointerCapture(ev.pointerId); });
@@ -167,6 +203,7 @@
       if (!dragging) return; dragging = false;
       if (moved) { const a = anchorFor(ev.clientX, ev.clientY); rec.anchor = a.label; rec.selector = a.selector; rec.ax = a.ax; rec.ay = a.ay; save(); }
       else { open = !open; show(open); }
+      if (moved && open) platziereZettel(el);
     });
     el.querySelector('.avfb-ok').addEventListener('click', ev => { ev.stopPropagation(); rec.text = ta.value.trim(); open = false; show(false); save(); });
     el.querySelector('.avfb-del').addEventListener('click', ev => { ev.stopPropagation(); removeItem(rec); });
@@ -178,9 +215,9 @@
   /* ---------- Zeichnung aus Daten ---------- */
   function buildDraw(d) {
     const scale = d.w ? window.innerWidth / d.w : 1;
-    if (d.type === 'pen') return mk('path', { d: d.path, fill: 'none', stroke: 'var(--mhf-mark, #d8402f)', 'stroke-width': 3, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' });
-    if (d.type === 'circle') { const m = (d.path || '').replace('e ', '').split(','); if (m.length < 4) return null; return mk('ellipse', { cx: m[0] * scale, cy: m[1], rx: m[2] * scale, ry: m[3], fill: 'none', stroke: 'var(--mhf-mark, #d8402f)', 'stroke-width': 3 }); }
-    if (d.type === 'line') { const m = (d.path || '').replace('l ', '').split(','); if (m.length < 4) return null; return mk('line', { x1: m[0] * scale, y1: m[1], x2: m[2] * scale, y2: m[3], stroke: 'var(--mhf-mark, #d8402f)', 'stroke-width': 3, 'stroke-linecap': 'round' }); }
+    if (d.type === 'pen') return mk('path', { d: d.path, fill: 'none', stroke: 'var(--mhf-mark, #E8395F)', 'stroke-width': 3, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' });
+    if (d.type === 'circle') { const m = (d.path || '').replace('e ', '').split(','); if (m.length < 4) return null; return mk('ellipse', { cx: m[0] * scale, cy: m[1], rx: m[2] * scale, ry: m[3], fill: 'none', stroke: 'var(--mhf-mark, #E8395F)', 'stroke-width': 3 }); }
+    if (d.type === 'line') { const m = (d.path || '').replace('l ', '').split(','); if (m.length < 4) return null; return mk('line', { x1: m[0] * scale, y1: m[1], x2: m[2] * scale, y2: m[3], stroke: 'var(--mhf-mark, #E8395F)', 'stroke-width': 3, 'stroke-linecap': 'round' }); }
     return null;
   }
 
@@ -204,7 +241,7 @@
     layer.style.pointerEvents = 'none';
     const b = document.createElement('div');
     b.className = 'avfb-replay-bar';
-    b.innerHTML = '<span>' + esc(REPLAY.title || T.reviewHead) + '</span><a href="' + esc(REPLAY.back) + '">' + esc(T.reviewBack) + ' ✕</a>';
+    b.innerHTML = '<span>' + esc(REPLAY.title || T.reviewHead) + '</span><a href="' + esc(REPLAY.back) + '">' + esc(T.replayBack || 'Zurück zur Liste') + '</a>';
     root.appendChild(b);
     buildAll(REPLAY.items, true);
     place();
@@ -221,7 +258,7 @@
   /* =================== NORMAL-MODUS =================== */
   const startBtn = document.createElement('button');
   startBtn.className = 'avfb-start'; startBtn.id = 'avfb-start';
-  startBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2Z"/></svg>' + esc(T.start);
+  startBtn.innerHTML = zeichen() + '<span>' + esc(T.start) + '</span>';
   root.appendChild(startBtn);
 
   /* --- Kurze Erklärung der Werkzeuge ---------------------------------- */
@@ -242,6 +279,7 @@
   /** Erklärt in einem Satz je Werkzeug, was es tut. */
   function showTip(nurAnsehen) {
     tipSeen = true;
+    const alt = root.querySelector('.avfb-tip'); if (alt) alt.remove(); // Das Fragezeichen öffnete sonst bei jedem Klick noch eines.
 
     const zeilen = [
       [ico.pin, T.comment, T.helpPin],
@@ -249,18 +287,19 @@
       [ico.circle, T.circle, T.helpCircle],
       [ico.line, T.underline, T.helpLine],
       [ico.undo, T.undo, T.helpUndo]
-    ].map(z => '<li>' + z[0] + '<span><b>' + esc(z[1]) + '</b> ' + esc(z[2]) + '</span></li>').join('');
+    ].map(z => '<li>' + z[0] + '<span><b>' + esc(z[1]) + '</b><span>' + esc(satz(z[2])) + '</span></span></li>').join('');
 
     const tip = document.createElement('div');
     tip.className = 'avfb-tip avfb-tip--hilfe';
+    tip.setAttribute('role', 'dialog'); tip.setAttribute('aria-label', T.helpHead);
     tip.innerHTML =
-      '<b>' + esc(T.helpHead) + '</b>' +
+      '<p class="avfb-tiphead">' + zeichen() + '<span>' + esc(T.helpHead) + '</span></p>' +
       '<p class="avfb-tiplead">' + esc(T.hint) + '</p>' +
       '<ul class="avfb-hilfe">' + zeilen + '</ul>' +
       '<p class="avfb-tipfoot">' + esc(T.helpDone) + '</p>' +
       '<div class="avfb-tipbtns">' +
-        '<button type="button" id="avfb-tip-ok">' + esc(T.gotit) + '</button>' +
-        (nurAnsehen ? '' : '<button type="button" class="avfb-tip-skip" id="avfb-tip-skip">' + esc(T.helpSkip) + '</button>') +
+        '<button class="avfb-tip-ok" id="avfb-tip-ok">' + esc(T.gotit) + '</button>' +
+        (nurAnsehen ? '' : '<button class="avfb-tip-skip" id="avfb-tip-skip">' + esc(T.helpSkip) + '</button>') +
       '</div>';
     root.appendChild(tip);
 
@@ -268,6 +307,9 @@
       tip.remove();
       if (!nurAnsehen) openBar();
     });
+
+    tip.addEventListener('keydown', ev => { if (ev.key === 'Escape') tip.querySelector('#avfb-tip-ok').click(); });
+    tip.querySelector('#avfb-tip-ok').focus({ preventScroll: true });
 
     const skip = tip.querySelector('#avfb-tip-skip');
     if (skip) {
@@ -356,9 +398,9 @@
     const p = docPt(e);
     if (tool === 'pin') return;
     layer.setPointerCapture(e.pointerId);
-    if (tool === 'pen') draw = { type: 'pen', el: mk('path', { d: 'M ' + p.x + ' ' + p.y, fill: 'none', stroke: 'var(--mhf-mark, #d8402f)', 'stroke-width': 3, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }), pts: [p] };
-    else if (tool === 'circle') draw = { type: 'circle', el: mk('ellipse', { fill: 'none', stroke: 'var(--mhf-mark, #d8402f)', 'stroke-width': 3 }), x0: p.x, y0: p.y };
-    else if (tool === 'line') draw = { type: 'line', el: mk('line', { stroke: 'var(--mhf-mark, #d8402f)', 'stroke-width': 3, 'stroke-linecap': 'round', x1: p.x, y1: p.y, x2: p.x, y2: p.y }), x0: p.x, y0: p.y };
+    if (tool === 'pen') draw = { type: 'pen', el: mk('path', { d: 'M ' + p.x + ' ' + p.y, fill: 'none', stroke: 'var(--mhf-mark, #E8395F)', 'stroke-width': 3, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }), pts: [p] };
+    else if (tool === 'circle') draw = { type: 'circle', el: mk('ellipse', { fill: 'none', stroke: 'var(--mhf-mark, #E8395F)', 'stroke-width': 3 }), x0: p.x, y0: p.y };
+    else if (tool === 'line') draw = { type: 'line', el: mk('line', { stroke: 'var(--mhf-mark, #E8395F)', 'stroke-width': 3, 'stroke-linecap': 'round', x1: p.x, y1: p.y, x2: p.x, y2: p.y }), x0: p.x, y0: p.y };
   });
   layer.addEventListener('pointermove', e => {
     if (!draw) return; const p = docPt(e);
@@ -404,7 +446,7 @@
   function openReview() {
     const pins = items.filter(i => i.type === 'pin'), marks = items.filter(i => i.type !== 'pin');
     let list = '';
-    pins.forEach(c => { list += '<div class="avfb-item"><div class="avfb-badge">' + c.n + '</div><div><div class="avfb-itxt">' + (c.text ? esc(c.text) : '<span class="avfb-empty">' + esc(T.noText) + '</span>') + '</div><div class="avfb-imeta">' + esc(c.anchor) + '</div></div></div>'; });
+    pins.forEach(c => { list += '<div class="avfb-item"><div class="avfb-badge">' + c.n + '</div><div><div class="avfb-itxt">' + (c.text ? esc(c.text) : '<span class="avfb-empty">' + esc(T.noText) + '</span>') + '</div>' + (ortsname(c.anchor) ? '<div class="avfb-imeta">' + esc(ortsname(c.anchor)) + '</div>' : '') + '</div></div>'; });
     if (marks.length) list += '<div class="avfb-item"><div class="avfb-badge">✎</div><div><div class="avfb-itxt">' + esc(T.marks) + '</div><div class="avfb-imeta">' + marks.length + '×</div></div></div>';
     if (!list) list = '<p class="avfb-empty">' + esc(T.empty) + '</p>';
     const rv = document.createElement('div');
