@@ -48,6 +48,14 @@
 .avfb button:focus-visible{outline:2px solid #fff;outline-offset:2px}
 .avfb .avfb-tip, .avfb .avfb-box, .avfb .avfb-pop, .avfb .avfb-pop textarea{scrollbar-width:thin;scrollbar-color:rgba(226,219,208,.45) transparent}
 
+/* Oberste Ebene: Annotationsebene, Knopf, Hilfe, Leiste und Übersicht laufen als
+   Popover (nachOben() in feedback.js). Dort verdeckt sie kein Theme mehr, egal
+   welchen z-index oder Stapelkontext es setzt. Der Browser gibt Popovers aber
+   eigene Grundwerte mit: mittig, mit Rahmen, Innenabstand, Hintergrund und
+   Scrollbalken. Diese Regel nimmt sie zurück. Ohne Gewicht (:where), damit jede
+   Regel weiter unten sie wieder überschreibt. */
+:where(.avfb [popover]){inset:auto;margin:0;width:auto;height:auto;padding:0;border:0;overflow:visible;color:inherit;background:transparent}
+
 /* Annotationsebene: liegt über dem Dokument und scrollt mit. */
 #avfb-layer{position:absolute;inset:0;z-index:2147483000;pointer-events:none}
 #avfb-layer.avfb-armed{pointer-events:auto}

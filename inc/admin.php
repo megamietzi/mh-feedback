@@ -28,9 +28,23 @@ add_action( 'admin_menu', function () {
 } );
 
 function mhf_admin_page() {
-	if ( isset( $_GET['del'] ) && check_admin_referer( 'mhf_del' ) ) { // phpcs:ignore
-		wp_delete_post( absint( $_GET['del'] ), true );
-		echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Rückmeldung gelöscht.', 'mh-feedback' ) . '</p></div>';
+	/*
+	 * Löschen nur, was wirklich eine Rückmeldung ist, und nur mit Recht dazu.
+	 * Bis 1.1.0 löschte der Link jede ID endgültig, und der Sicherheitsschlüssel
+	 * galt für alle IDs: Wer die Seite sehen durfte (ab „Mitarbeiter“), konnte so
+	 * jede Seite der Website löschen. Jetzt ist der Schlüssel an die ID
+	 * gebunden, und WordPress prüft das Löschrecht für genau diesen Eintrag –
+	 * das haben Redakteure und Administratoren.
+	 */
+	if ( isset( $_GET['del'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- geprüft in check_admin_referer
+		$del_id = absint( $_GET['del'] ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		check_admin_referer( 'mhf_del_' . $del_id );
+		if ( $del_id && MHF_CPT === get_post_type( $del_id ) && current_user_can( 'delete_post', $del_id ) ) {
+			wp_delete_post( $del_id, true );
+			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Rückmeldung gelöscht.', 'mh-feedback' ) . '</p></div>';
+		} else {
+			echo '<div class="notice notice-error is-dismissible"><p>' . esc_html__( 'Diese Rückmeldung kann nicht gelöscht werden.', 'mh-feedback' ) . '</p></div>';
+		}
 	}
 
 	$posts = get_posts( array(
@@ -40,10 +54,15 @@ function mhf_admin_page() {
 	) );
 
 	$link = home_url( '/?mhf=' . get_option( 'mhf_token' ) );
+
+	// Einstellungen (Zugangsschlüssel, GitHub-Token) nur für Administratoren.
+	// Speichern könnten andere sie über options.php ohnehin nicht.
+	$darf_einstellen = current_user_can( 'manage_options' );
 	?>
 	<div class="wrap">
 		<h1><?php esc_html_e( 'Rückmeldungen', 'mh-feedback' ); ?></h1>
 
+		<?php if ( $darf_einstellen ) : ?>
 		<form method="post" action="options.php" style="background:#fff;border:1px solid #ccd0d4;padding:6px 18px 12px;margin:16px 0 26px">
 			<?php settings_fields( 'mhf' ); ?>
 			<table class="form-table" role="presentation">
@@ -102,7 +121,7 @@ function mhf_admin_page() {
 							<input type="text" name="mhf_gh_repo" class="regular-text code" value="<?php echo esc_attr( get_option( 'mhf_gh_repo' ) ); ?>" placeholder="benutzer/mh-feedback"></label></p>
 						<p><label><?php esc_html_e( 'Branch', 'mh-feedback' ); ?><br>
 							<input type="text" name="mhf_gh_branch" class="regular-text code" value="<?php echo esc_attr( get_option( 'mhf_gh_branch', 'main' ) ); ?>" placeholder="main"></label></p>
-						<p><label><?php esc_html_e( 'Zugriffs-Token (nur bei privatem Repo)', 'mh-feedback' ); ?><br>
+						<p><label><?php esc_html_e( 'Zugriffs-Token (bei privatem Repo oder wenn das GitHub-Limit greift)', 'mh-feedback' ); ?><br>
 							<input type="password" name="mhf_gh_token" class="regular-text code" value="<?php echo esc_attr( get_option( 'mhf_gh_token' ) ); ?>" autocomplete="off"></label></p>
 						<p class="description" style="max-width:70ch">
 							<?php esc_html_e( 'Format „benutzer/repo“ (oder die volle GitHub-Adresse). Sobald ein Repository hinterlegt ist, prüft WordPress dort auf neue Versionen und zeigt „Update verfügbar“ wie bei normalen Plugins. Öffentliches Repo → Token leer lassen.', 'mh-feedback' ); ?>
@@ -110,11 +129,13 @@ function mhf_admin_page() {
 							<strong><?php esc_html_e( 'Neue Version veröffentlichen:', 'mh-feedback' ); ?></strong>
 							<?php esc_html_e( 'Einfach im Repo in der Datei mh-feedback.php die „Version:“-Zahl oben erhöhen und speichern/pushen. Keine Releases nötig. Alle Seiten sehen das Update dann automatisch (oder sofort über „Nach Updates suchen“).', 'mh-feedback' ); ?>
 						</p>
+						<?php mhf_update_status_box(); ?>
 					</td>
 				</tr>
 			</table>
 			<?php submit_button(); ?>
 		</form>
+		<?php endif; ?>
 
 		<?php if ( ! $posts ) : ?>
 			<p><?php esc_html_e( 'Noch keine Rückmeldungen. Sobald jemand auf „Fertig“ klickt, erscheinen sie hier.', 'mh-feedback' ); ?></p>
@@ -126,7 +147,7 @@ function mhf_admin_page() {
 				$pins  = array_filter( $items, function ( $i ) { return 'pin' === ( $i['type'] ?? '' ); } );
 				$marks = count( $items ) - count( $pins );
 				$show  = $page ? add_query_arg( 'mhf_show', $p->ID, $page ) : '';
-				$del   = wp_nonce_url( admin_url( 'admin.php?page=mhf&del=' . $p->ID ), 'mhf_del' );
+				$del   = current_user_can( 'delete_post', $p->ID ) ? wp_nonce_url( admin_url( 'admin.php?page=mhf&del=' . $p->ID ), 'mhf_del_' . $p->ID ) : '';
 				?>
 				<div class="postbox" style="margin-top:14px">
 					<div class="postbox-header"><h2 class="hndle" style="padding:10px 14px">
@@ -134,8 +155,10 @@ function mhf_admin_page() {
 						<?php if ( $show ) : ?>
 							<a href="<?php echo esc_url( $show ); ?>" target="_blank" rel="noopener" style="font-weight:400;font-size:13px;margin-left:12px"><?php esc_html_e( 'Auf der Seite ansehen', 'mh-feedback' ); ?> ↗</a>
 						<?php endif; ?>
+						<?php if ( $del ) : ?>
 						<a href="<?php echo esc_url( $del ); ?>" style="font-weight:400;font-size:12px;margin-left:12px;color:#b32d2e"
 							onclick="return confirm('<?php echo esc_js( __( 'Diese Rückmeldung löschen?', 'mh-feedback' ) ); ?>')"><?php esc_html_e( 'löschen', 'mh-feedback' ); ?></a>
+						<?php endif; ?>
 					</h2></div>
 					<div class="inside" style="padding:0 14px 12px">
 						<?php if ( $pins ) : ?>

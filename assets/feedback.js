@@ -31,6 +31,23 @@
   const layer = root.querySelector('#avfb-layer');
   const svg = root.querySelector('#avfb-ink');
 
+  /*
+   * Oberste Ebene. Alles, was über der Seite liegen muss, kommt als Popover in
+   * die oberste Ebene des Browsers. Dort kann es kein Theme verdecken. Bis 1.1.0
+   * hing das am z-index – und der wirkt nur innerhalb des Stapelkontexts. Ein
+   * einziges view-transition-name, transform oder filter am Behälter .avfb, und
+   * Hero-Texte, Buttons und Karten lagen über Hilfe, Leiste und Pins.
+   * Reihenfolge = Stapelung: Was später nach oben kommt, liegt darüber. Darum
+   * zuerst die Ebene, dann Knopf, Hilfe, Leiste, Übersicht.
+   * Browser ohne Popover (vor 2024) bleiben beim z-index wie bisher.
+   */
+  const OBEN = typeof HTMLElement === 'function' && typeof HTMLElement.prototype.showPopover === 'function';
+  function nachOben(el) {
+    if (!OBEN || !el.isConnected) return;
+    try { el.setAttribute('popover', 'manual'); el.showPopover(); } catch (e) { el.removeAttribute('popover'); }
+  }
+  nachOben(layer);
+
   let bar = null, tool = 'view', seq = 0, sent = false;
   const items = [], redo = [];
   const replayPins = [];
@@ -243,6 +260,7 @@
     b.className = 'avfb-replay-bar';
     b.innerHTML = '<span>' + esc(REPLAY.title || T.reviewHead) + '</span><a href="' + esc(REPLAY.back) + '">' + esc(T.replayBack || 'Zurück zur Liste') + '</a>';
     root.appendChild(b);
+    nachOben(b);
     buildAll(REPLAY.items, true);
     place();
     document.addEventListener('click', () => closeAllPins());
@@ -260,6 +278,7 @@
   startBtn.className = 'avfb-start'; startBtn.id = 'avfb-start';
   startBtn.innerHTML = zeichen() + '<span>' + esc(T.start) + '</span>';
   root.appendChild(startBtn);
+  nachOben(startBtn);
 
   /* --- Kurze Erklärung der Werkzeuge ---------------------------------- */
 
@@ -302,6 +321,7 @@
         (nurAnsehen ? '' : '<button class="avfb-tip-skip" id="avfb-tip-skip">' + esc(T.helpSkip) + '</button>') +
       '</div>';
     root.appendChild(tip);
+    nachOben(tip);
 
     tip.querySelector('#avfb-tip-ok').addEventListener('click', () => {
       tip.remove();
@@ -337,6 +357,7 @@
         '<span class="avfb-lbl">' + esc(T.cancel) + '</span></button>' +
       '<button class="avfb-done" id="avfb-done"><svg width="18" height="18" viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>' + esc(T.done) + '</button>';
     root.appendChild(bar);
+    nachOben(bar);
     requestAnimationFrame(() => bar.classList.add('avfb-in'));
     bar.querySelectorAll('.avfb-tool[data-tool]').forEach(b => b.addEventListener('click', () => setTool(b.dataset.tool)));
     bar.querySelector('#avfb-undo').addEventListener('click', undo);
@@ -453,6 +474,7 @@
     rv.className = 'avfb-review avfb-open';
     rv.innerHTML = '<div class="avfb-box"><p class="avfb-kick">' + esc(T.reviewKick) + '</p><h2 class="avfb-h">' + esc(T.reviewHead) + '</h2><input class="avfb-name" id="avfb-name" placeholder="' + esc(T.namePrompt) + '" maxlength="80"><div id="avfb-list">' + list + '</div><div class="avfb-foot"><button class="avfb-ghost avfb-drop" id="avfb-drop">' + esc(T.cancel) + '</button><button class="avfb-ghost" id="avfb-back">' + esc(T.reviewBack) + '</button><button class="avfb-solid" id="avfb-send"' + (items.length ? '' : ' disabled') + '>' + esc(T.send) + '</button></div></div>';
     root.appendChild(rv);
+    nachOben(rv);
     rv.querySelector('#avfb-back').addEventListener('click', () => rv.remove());
     rv.querySelector('#avfb-drop').addEventListener('click', () => { rv.remove(); abbrechen(); });
     rv.querySelector('#avfb-send').addEventListener('click', () => submit(rv));

@@ -117,6 +117,9 @@ function mhf_submit() {
 	update_post_meta( $id, '_mhf_items', wp_slash( wp_json_encode( $clean, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ) ) );
 	update_post_meta( $id, '_mhf_page', $page );
 	update_post_meta( $id, '_mhf_name', $name );
+	// Kennzeichen „sauber gespeichert“: Einträge damit braucht mhf_items() nicht
+	// zu reparieren. Siehe mhf_repariere_umlaute().
+	update_post_meta( $id, '_mhf_format', 2 );
 
 	mhf_notify( $id, $name, $page, $clean );
 
@@ -213,6 +216,11 @@ function mhf_items( $id ) {
 	if ( ! is_array( $items ) ) {
 		return array();
 	}
+	// Seit 1.1.1 gespeicherte Einträge sind sauber. Die Reparatur würde dort nur
+	// Schaden anrichten.
+	if ( (int) get_post_meta( $id, '_mhf_format', true ) >= 2 ) {
+		return $items;
+	}
 	foreach ( $items as $k => $it ) {
 		if ( isset( $it['text'] ) ) {
 			$items[ $k ]['text'] = mhf_repariere_umlaute( (string) $it['text'] );
@@ -227,20 +235,24 @@ function mhf_items( $id ) {
 /**
  * Entschärfte uXXXX-Reste zurück in echte Zeichen wandeln.
  *
- * Nur oberhalb von U+007F, damit normaler Text („u0815“) unangetastet bleibt.
+ * Läuft nur noch für Altbestand ohne _mhf_format. Und auch dort nur für die
+ * Folgen, die der alte Fehler wirklich erzeugt hat: Buchstaben mit Akzent und
+ * Umlaute (u00C0–u00FF) sowie Anführungszeichen, Striche, Auslassungspunkte
+ * und Euro (u2010–u203A, u20AC). Ein offenes Muster wie u[0-9a-f]{4} traf auch
+ * ganz normale Wörter: aus „Staubdecke“ wurde „Sta뷬ke“, aus „Laubdach“ „La붬h“.
  *
  * @param string $text Text.
  * @return string
  */
 function mhf_repariere_umlaute( $text ) {
-	if ( false === strpos( $text, 'u00' ) && ! preg_match( '/u[0-9a-fA-F]{4}/', $text ) ) {
+	if ( false === strpos( $text, 'u00' ) && false === strpos( $text, 'u20' ) ) {
 		return $text;
 	}
 	return preg_replace_callback(
-		'/u([0-9a-fA-F]{4})/',
+		'/u(00[c-fC-F][0-9a-fA-F]|20[1-3][0-9a-fA-F]|20[aA][cC])/',
 		function ( $m ) {
 			$code = hexdec( $m[1] );
-			return $code >= 0x80 ? mb_chr( $code, 'UTF-8' ) : $m[0];
+			return ( $code >= 0x2010 && $code <= 0x203A ) || $code <= 0xFF || 0x20AC === $code ? mb_chr( $code, 'UTF-8' ) : $m[0];
 		},
 		$text
 	);

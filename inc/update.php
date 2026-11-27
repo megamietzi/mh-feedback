@@ -63,6 +63,7 @@ class MHF_GitHub_Updater {
 	private $folder; // z. B. mh-feedback
 	private $repo;   // benutzer/repo
 	private $token;
+	private $fehler = ''; // Was bei der letzten Anfrage schiefging, in Worten.
 
 	public function __construct( $file ) {
 		$this->file   = $file;
@@ -97,10 +98,58 @@ class MHF_GitHub_Updater {
 			$args['headers']['Authorization'] = 'Bearer ' . $this->token;
 		}
 		$res = wp_remote_get( 'https://api.github.com/repos/' . $this->repo . $path, $args );
-		if ( is_wp_error( $res ) || 200 !== (int) wp_remote_retrieve_response_code( $res ) ) {
+
+		if ( is_wp_error( $res ) ) {
+			/* translators: %s: Fehlermeldung von WordPress */
+			$this->fehler = sprintf( __( 'Keine Verbindung zu GitHub: %s', 'mh-feedback' ), $res->get_error_message() );
+			return null;
+		}
+
+		$code = (int) wp_remote_retrieve_response_code( $res );
+		if ( 200 !== $code ) {
+			$this->fehler = $this->fehler_text( $code, $res );
 			return null;
 		}
 		return json_decode( wp_remote_retrieve_body( $res ), true );
+	}
+
+	/** GitHub-Antwortcodes so übersetzen, dass klar ist, was zu tun ist. */
+	private function fehler_text( $code, $res ) {
+		$rest = (string) wp_remote_retrieve_header( $res, 'x-ratelimit-remaining' );
+
+		if ( ( 403 === $code || 429 === $code ) && '0' === $rest ) {
+			$frei = (int) wp_remote_retrieve_header( $res, 'x-ratelimit-reset' );
+			return sprintf(
+				/* translators: %s: Uhrzeit */
+				__( 'GitHub-Limit erreicht. Ohne Token erlaubt GitHub 60 Anfragen pro Stunde je Server-Adresse, und auf geteiltem Hosting teilen sich viele Seiten eine Adresse. Wieder frei ab %s Uhr. Abhilfe: im Feld „Zugriffs-Token“ einen GitHub-Token eintragen (nur Leserechte nötig).', 'mh-feedback' ),
+				$frei ? wp_date( 'H:i', $frei ) : '…'
+			);
+		}
+		if ( 401 === $code ) {
+			return __( 'GitHub lehnt den Token ab (401). Token prüfen oder das Feld leeren, das Repo ist öffentlich.', 'mh-feedback' );
+		}
+		if ( 404 === $code ) {
+			return sprintf(
+				/* translators: %s: benutzer/repo */
+				__( 'GitHub meldet 404 für %s: Repository oder Branch stimmt nicht, oder das Repo ist privat und es fehlt ein Token.', 'mh-feedback' ),
+				$this->repo
+			);
+		}
+		/* translators: %d: HTTP-Statuscode */
+		return sprintf( __( 'GitHub antwortet mit HTTP %d.', 'mh-feedback' ), $code );
+	}
+
+	/** Ergebnis der letzten echten Prüfung merken, für die Anzeige im Backend. */
+	private function merke_status( $version ) {
+		update_option(
+			'mhf_gh_status',
+			array(
+				'zeit'    => time(),
+				'version' => (string) $version,
+				'fehler'  => $version ? '' : (string) $this->fehler,
+			),
+			false
+		);
 	}
 
 	/**
@@ -122,28 +171,59 @@ class MHF_GitHub_Updater {
 			$branch = 'main';
 		}
 
-		// Datei-Header im Branch holen und Versionsnummer herauslesen.
-		$file = $this->api( '/contents/mh-feedback.php?ref=' . rawurlencode( $branch ) );
-		$ver  = '';
-		if ( $file && ! empty( $file['content'] ) ) {
-			$php = base64_decode( str_replace( array( "\n", "\r" ), '', $file['content'] ) );
-			if ( $php && preg_match( '~^[ \t*]*Version:\s*([0-9][^\s]*)~mi', $php, $m ) ) {
-				$ver = trim( $m[1] );
+		/*
+		 * Erst den neuesten Commit des Branches holen, dann Versionszeile und
+		 * Download genau dieses Commits. Bis 1.1.0 lud das Update den Branch so,
+		 * wie er beim Herunterladen gerade war – bis zu 12 Stunden nach der
+		 * Prüfung, also womöglich mit Änderungen, die danach gepusht wurden.
+		 */
+		$this->fehler = '';
+		$commit = $this->api( '/commits/' . rawurlencode( $branch ) );
+		$sha    = ( is_array( $commit ) && ! empty( $commit['sha'] ) && preg_match( '~^[0-9a-f]{40}$~', (string) $commit['sha'] ) ) ? $commit['sha'] : '';
+
+		$ver = '';
+		if ( $sha ) {
+			$file = $this->api( '/contents/mh-feedback.php?ref=' . $sha );
+			if ( $file && ! empty( $file['content'] ) ) {
+				$php = base64_decode( str_replace( array( "\n", "\r" ), '', $file['content'] ) );
+				if ( $php && preg_match( '~^[ \t*]*Version:\s*([0-9][^\s]*)~mi', $php, $m ) ) {
+					$ver = trim( $m[1] );
+				}
 			}
 		}
 		if ( ! $ver ) {
-			set_transient( 'mhf_gh_latest', array(), 6 * HOUR_IN_SECONDS );
+			if ( ! $this->fehler ) {
+				$this->fehler = __( 'In mh-feedback.php auf GitHub steht keine lesbare „Version:“-Zeile.', 'mh-feedback' );
+			}
+			// Eine Stunde statt sechs: Das GitHub-Limit ist nach spätestens einer
+			// Stunde wieder frei, länger zu warten bringt nichts.
+			set_transient( 'mhf_gh_latest', array(), HOUR_IN_SECONDS );
+			$this->merke_status( '' );
 			return null;
 		}
 
+		$nachricht = isset( $commit['commit']['message'] ) ? (string) $commit['commit']['message'] : '';
+
 		$data = array(
 			'version' => ltrim( $ver, 'vV' ),
-			'package' => 'https://api.github.com/repos/' . $this->repo . '/zipball/' . rawurlencode( $branch ),
+			'package' => 'https://api.github.com/repos/' . $this->repo . '/zipball/' . $sha,
 			'url'     => 'https://github.com/' . $this->repo,
-			'body'    => '',
+			// Die Commit-Nachricht erscheint unter „Details ansehen“.
+			'body'    => mb_substr( $nachricht, 0, 3000 ),
 		);
 		set_transient( 'mhf_gh_latest', $data, 12 * HOUR_IN_SECONDS );
+		$this->merke_status( $data['version'] );
 		return $data;
+	}
+
+	/**
+	 * Sofort bei GitHub nachsehen, unabhängig von WordPress' eigener Prüfung.
+	 * Die bricht ab, wenn wordpress.org nicht antwortet, und fragt dann auch
+	 * dieses Plugin nicht – der Status bliebe leer.
+	 */
+	public function pruefen() {
+		delete_transient( 'mhf_gh_latest' );
+		return $this->latest();
 	}
 
 	/** In die Update-Liste eintragen, wenn GitHub eine neuere Version hat. */
@@ -245,7 +325,74 @@ class MHF_GitHub_Updater {
 }
 
 /* Updater starten (Haupt-Plugin-Datei liegt eine Ebene über /inc). */
-new MHF_GitHub_Updater( MHF_DIR . 'mh-feedback.php' );
+$GLOBALS['mhf_updater'] = new MHF_GitHub_Updater( MHF_DIR . 'mh-feedback.php' );
+
+/*
+ * „Jetzt prüfen“ auf der Einstellungsseite: Zwischenspeicher leeren, WordPress
+ * neu nach Updates fragen lassen und zurück zur Seite, wo das Ergebnis steht.
+ */
+add_action( 'admin_post_mhf_jetzt_pruefen', function () {
+	if ( ! current_user_can( 'update_plugins' ) ) {
+		wp_die( esc_html__( 'Dafür fehlt die Berechtigung.', 'mh-feedback' ), 403 );
+	}
+	check_admin_referer( 'mhf_jetzt_pruefen' );
+
+	// Erst selbst fragen (das schreibt den Status), dann WordPress die
+	// Update-Liste neu aufbauen lassen – aus dem frischen Zwischenspeicher.
+	if ( isset( $GLOBALS['mhf_updater'] ) && $GLOBALS['mhf_updater'] instanceof MHF_GitHub_Updater ) {
+		$GLOBALS['mhf_updater']->pruefen();
+	}
+	delete_site_transient( 'update_plugins' );
+	if ( ! function_exists( 'wp_update_plugins' ) ) {
+		require_once ABSPATH . WPINC . '/update.php';
+	}
+	wp_update_plugins();
+
+	wp_safe_redirect( admin_url( 'admin.php?page=mhf#mhf-update-status' ) );
+	exit;
+} );
+
+/**
+ * Kasten „Update-Status“ unter den GitHub-Einstellungen.
+ *
+ * Ohne ihn blieb ein Fehler unsichtbar: Der Updater merkte sich das leere
+ * Ergebnis stundenlang, und im Backend sah alles in Ordnung aus.
+ */
+function mhf_update_status_box() {
+	$s      = get_option( 'mhf_gh_status' );
+	$farbe  = '#c3c4c7';
+	$zeilen = array();
+
+	if ( ! is_array( $s ) || empty( $s['zeit'] ) ) {
+		$zeilen[] = esc_html__( 'Seit dieser Version wurde noch nicht bei GitHub nachgesehen.', 'mh-feedback' );
+	} else {
+		/* translators: %s: Datum und Uhrzeit */
+		$zeilen[] = sprintf( esc_html__( 'Letzte Prüfung: %s', 'mh-feedback' ), esc_html( wp_date( 'j.n.Y, H:i', (int) $s['zeit'] ) ) );
+
+		if ( ! empty( $s['fehler'] ) ) {
+			$farbe    = '#d63638';
+			$zeilen[] = '<strong>' . esc_html__( 'Fehler:', 'mh-feedback' ) . '</strong> ' . esc_html( $s['fehler'] );
+		} else {
+			$neu      = version_compare( (string) $s['version'], MHF_VERSION, '>' );
+			$farbe    = $neu ? '#dba617' : '#00a32a';
+			$zeilen[] = sprintf(
+				/* translators: 1: Version auf GitHub, 2: installierte Version */
+				esc_html__( 'Auf GitHub: %1$s · installiert: %2$s', 'mh-feedback' ),
+				esc_html( $s['version'] ),
+				esc_html( MHF_VERSION )
+			) . ' – ' . ( $neu ? esc_html__( 'Update verfügbar.', 'mh-feedback' ) : esc_html__( 'aktuell.', 'mh-feedback' ) );
+		}
+	}
+
+	echo '<div id="mhf-update-status" style="margin-top:14px;padding:10px 12px;border-left:4px solid ' . esc_attr( $farbe ) . ';background:#f6f7f7;max-width:70ch">';
+	echo '<p style="margin:0 0 6px"><strong>' . esc_html__( 'Update-Status', 'mh-feedback' ) . '</strong></p>';
+	echo '<p style="margin:0">' . implode( '<br>', $zeilen ) . '</p>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- oben einzeln escaped
+	if ( current_user_can( 'update_plugins' ) ) {
+		$url = wp_nonce_url( admin_url( 'admin-post.php?action=mhf_jetzt_pruefen' ), 'mhf_jetzt_pruefen' );
+		echo '<p style="margin:8px 0 0"><a class="button" href="' . esc_url( $url ) . '">' . esc_html__( 'Jetzt prüfen', 'mh-feedback' ) . '</a></p>';
+	}
+	echo '</div>';
+}
 
 /*
  * „Dashboard → Aktualisierungen → Erneut prüfen“ soll wirklich neu bei GitHub
