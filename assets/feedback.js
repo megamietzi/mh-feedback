@@ -182,6 +182,25 @@
     if (schub) pop.style.setProperty('--avfb-schub', Math.round(schub) + 'px');
   }
 
+  // Das Notizfeld wächst mit dem Text. Grenzen: max-height aus dem CSS, und mit
+  // bisRand auch der Fensterrand in der Richtung, in die der Zettel aufklappt.
+  // Nach oben wächst er über die Nadel hinaus; ohne diese Grenze rutschte sein
+  // Anfang oben aus dem Fenster, ganz oben auf der Seite sogar unerreichbar.
+  // Ist eine Grenze erreicht, scrollt das Feld.
+  function wachse(el, ta, bisRand) {
+    if (!ta.offsetParent) return;
+    ta.style.height = 'auto';
+    let soll = ta.scrollHeight + ta.offsetHeight - ta.clientHeight;
+    if (bisRand) {
+      const z = el.querySelector('.avfb-pop').getBoundingClientRect(), f = ta.getBoundingClientRect(), rand = 8;
+      const platz = el.classList.contains('avfb-pop--unten')
+        ? window.innerHeight - rand - f.top - (z.bottom - f.bottom)
+        : f.bottom - (f.top - z.top) - rand;
+      soll = Math.min(soll, platz);
+    }
+    ta.style.height = Math.ceil(soll) + 'px';
+  }
+
   /* ---------- Pin rendern ---------- */
   function renderPin(rec, replay, openNow) {
     const el = document.createElement('div');
@@ -190,7 +209,7 @@
     el.innerHTML = '<div class="avfb-dot"><span class="avfb-num">' + rec.n + '</span></div>' +
       (replay
         ? '<div class="avfb-pop avfb-pop--ro">' + (rec.text ? esc(rec.text) : '<em>' + esc(T.noText) + '</em>') + '</div>'
-        : '<div class="avfb-pop"><textarea placeholder="' + esc(T.placeholder) + '"></textarea><div class="avfb-poprow"><button class="avfb-del">' + esc(T.delete) + '</button><button class="avfb-ok">' + esc(T.apply) + '</button></div></div>');
+        : '<div class="avfb-pop"><textarea maxlength="2000" placeholder="' + esc(T.placeholder) + '"></textarea><div class="avfb-poprow"><button class="avfb-del">' + esc(T.delete) + '</button><button class="avfb-ok">' + esc(T.apply) + '</button></div></div>');
     layer.appendChild(el);
 
     // Zurückspiel-Modus: Zettel steckt im Pin und klappt erst auf Klick auf.
@@ -206,7 +225,11 @@
 
     const dot = el.querySelector('.avfb-dot'), pop = el.querySelector('.avfb-pop'), ta = el.querySelector('textarea');
     let open = !!openNow; show(open);
-    function show(v) { pop.style.display = v ? 'block' : 'none'; if (v) { ta.value = rec.text; platziereZettel(el); setTimeout(() => ta.focus({ preventScroll: true }), 0); } }
+    function show(v) { pop.style.display = v ? 'block' : 'none'; if (v) { ta.value = rec.text; richte(); setTimeout(() => ta.focus({ preventScroll: true }), 0); } }
+    // Erst volle Höhe, damit platziereZettel() die Richtung nach dem ganzen Text
+    // wählt. Dann auf den Platz in dieser Richtung begrenzen.
+    function richte() { wachse(el, ta, false); platziereZettel(el); wachse(el, ta, true); }
+    ta.addEventListener('input', () => wachse(el, ta, true));
 
     let dragging = false, moved = false, sx = 0, sy = 0, ox = 0, oy = 0;
     dot.addEventListener('pointerdown', ev => { ev.stopPropagation(); dragging = true; moved = false; sx = ev.clientX; sy = ev.clientY; ox = rec.x; oy = rec.y; dot.setPointerCapture(ev.pointerId); });
@@ -220,7 +243,7 @@
       if (!dragging) return; dragging = false;
       if (moved) { const a = anchorFor(ev.clientX, ev.clientY); rec.anchor = a.label; rec.selector = a.selector; rec.ax = a.ax; rec.ay = a.ay; save(); }
       else { open = !open; show(open); }
-      if (moved && open) platziereZettel(el);
+      if (moved && open) richte();
     });
     el.querySelector('.avfb-ok').addEventListener('click', ev => { ev.stopPropagation(); rec.text = ta.value.trim(); open = false; show(false); save(); });
     el.querySelector('.avfb-del').addEventListener('click', ev => { ev.stopPropagation(); removeItem(rec); });
